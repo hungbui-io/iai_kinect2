@@ -32,11 +32,13 @@
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl_conversions/pcl_conversions.h>
 //#include <pcl/filters/voxel_grid.h>
-//#include <pcl/filters/extract_indices.h>
+#include <pcl/filters/extract_indices.h>
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/crop_box.h>
 //#include <pcl/filters/boost.h>
-
+#include <pcl/common/transforms.h>
+#include <pcl/common/common_headers.h>
+#include <pcl/kdtree/kdtree_flann.h>
 
 #include <opencv2/opencv.hpp>
 
@@ -118,6 +120,10 @@ private:
 
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud;
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered;
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_sub1;
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_sub2;
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_sub3;
+   pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_sub4;
   pcl::PCDWriter writer;
   std::ostringstream oss;
   std::vector<int> params;
@@ -129,6 +135,7 @@ private:
   tf::TransformListener tf_listener_;
   std::map<std::string, double> joints;
   ros::Subscriber js_sub;
+  Eigen::Vector4f minPoint, maxPoint;
 
 public:
   Receiver(const std::string &topicColor, const std::string &topicDepth, const bool useExact, const bool useCompressed)
@@ -254,6 +261,12 @@ private:
     cloud_filtered->width = color.cols;
     cloud_filtered->is_dense = false;
     cloud_filtered->points.resize(cloud_filtered->height * cloud_filtered->width);
+
+    cloud_sub1 = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
+    cloud_sub2 = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
+    cloud_sub3 = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
+    cloud_sub4 = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
+
 
     switch(mode)
       {
@@ -528,40 +541,6 @@ private:
       double x22 = joint_state22.translation().x();
       double y22 = joint_state22.translation().y();
       double z22 = joint_state22.translation().z(); //hard coded because values from vision are not always reliable
-
-      double l_1, l_2, l_3;
-      tf::Matrix3x3 matrix;
-      Eigen::Matrix3d link_orientation = joint_state3.rotation();
-      tf::matrixEigenToTF(link_orientation, matrix);
-
-      //ROS_INFO_STREAM("Rotation: " << matrix);
-      matrix.getRPY(l_1, l_2, l_3);
-      ROS_INFO("roll: %1.2f", l_1);
-      ROS_INFO("pitch: %1.2f", l_2);
-      ROS_INFO("raw: %1.2f", l_3);
-      //ROS_INFO_STREAM("Rotation matrix of joint state 3: " << matrix);
-      //joint_state3.rotation().x();
-
-
-
-      double l_roll_deg3=195;//180
-      double l_pitch_deg3=35;//30
-      double l_yaw_deg3=180;//172
-
-      double l_roll_rad3 = l_roll_deg3 * (M_PI/180);
-      double l_pitch_rad3 = l_pitch_deg3 * (M_PI/180);
-      double l_yaw_rad3 = l_yaw_deg3 * (M_PI/180);
-
-      //double roll, pitch, yaw;
-      //ROS_INFO_STREAM("Rotation: " << joint_state3.rotation().get(roll, pitch, yaw));
-      //tf::Quaternion createQuaternionFromRPY(double l_roll_rad,double l_pitch_rad,double l_yaw_rad);
-      tf::Quaternion l_q3;
-      l_q3.setRPY(l_roll_rad3, l_pitch_rad3, l_yaw_rad3);
-      Eigen::Affine3d left_pose3 = Eigen::Translation3d(x3, y3, z3)
-          * Eigen::Quaterniond(l_q3);
-      ROS_ERROR("update State of Link");
-//        kinematic_state->updateStateWithLinkAt("left_forearm_link", left_pose3, false);
-      kinematic_state->update();
 
 
 //        ROS_INFO_STREAM("Rotation left_pose: " << left_pose3.rotation());
@@ -862,16 +841,192 @@ private:
       point24.y = pt24_.point.y;
       point24.z = pt24_.point.z;
 
+      //        double radius = 0.02;
+//              double r = 255.0;
+//              double g = 15.0;
+//              double b = 15.0;
+//              double r1 = 0.0;
+//              double g1 = 255.0;
+//              double b1 = 0.0;
+//              double r2 = 255.0;
+//              double g2 = 0.0;
+//              double b2 = 0.0;
+            int viewport = 0;
+
       pcl::PassThrough<pcl::PointXYZRGB> pass;
       pass.setInputCloud(cloud);
-      pass.setFilterFieldName ("x");
-      pass.setFilterLimits (point3.x, point22.x);
-      pass.setFilterFieldName ("y");
-      pass.setFilterLimits (point3.y, point22.y);
       pass.setFilterFieldName ("z");
-      pass.setFilterLimits (point3.z, point22.z);
+      pass.setFilterLimits (point3.z, point22.z-0.2);
       pass.setFilterLimitsNegative (true);
       pass.filter(*cloud_filtered);
+
+      pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree;
+      kdtree.setInputCloud(cloud_filtered);
+      pcl::PointXYZRGB searchPoint;
+      searchPoint.x = point22.x+0.04;
+      searchPoint.y = point22.y-0.08;
+      searchPoint.z = point22.z-0.08;
+
+      std::vector<int> pointIdxRadiusSearch;
+      std::vector<float> pointRadiusSquaredDistance;
+      float radius = 0.14;
+      if ( kdtree.radiusSearch (searchPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0 )
+        {
+//          for (size_t i = 0; i < pointIdxRadiusSearch.size (); ++i)
+//            std::cout << "    "  <<   cloud_filtered->points[ pointIdxRadiusSearch[i] ].x
+//                      << " " << cloud_filtered->points[ pointIdxRadiusSearch[i] ].y
+//                      << " " << cloud_filtered->points[ pointIdxRadiusSearch[i] ].z
+//                      << " (squared distance: " << pointRadiusSquaredDistance[i] << ")" << std::endl
+//                      << "indices size: " << pointIdxRadiusSearch.size() << std::endl;
+        }
+
+      pcl::PointIndices::Ptr ids (new pcl::PointIndices());
+      ids->indices = pointIdxRadiusSearch;
+
+      pcl::ExtractIndices<pcl::PointXYZRGB> extract;
+      extract.setInputCloud (cloud_filtered);
+      extract.setIndices (ids);
+      extract.setNegative (true);
+      extract.filter (*cloud_sub1);
+      cloud_filtered.swap(cloud_sub1);
+
+
+      pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree2;
+      kdtree2.setInputCloud(cloud_filtered);
+      pcl::PointXYZRGB searchPoint2;
+      searchPoint2.x = point112.x+0.07;
+      searchPoint2.y = point112.y-0.14;
+      searchPoint2.z = point112.z-0.14;
+
+      std::vector<int> pointIdxRadiusSearch2;
+      std::vector<float> pointRadiusSquaredDistance2;
+      float radius2 = 0.15;
+      if ( kdtree2.radiusSearch (searchPoint2, radius2, pointIdxRadiusSearch2, pointRadiusSquaredDistance2) > 0 )
+        {
+//          for (size_t i = 0; i < pointIdxRadiusSearch2.size (); ++i)
+//            std::cout << "    "  <<   cloud_filtered->points[ pointIdxRadiusSearch2[i] ].x
+//                      << " " << cloud_filtered->points[ pointIdxRadiusSearch2[i] ].y
+//                      << " " << cloud_filtered->points[ pointIdxRadiusSearch2[i] ].z
+//                      << " (squared distance: " << pointRadiusSquaredDistance2[i] << ")" << std::endl
+//                      << "indices size: " << pointIdxRadiusSearch2.size() << std::endl;
+        }
+
+      pcl::PointIndices::Ptr ids2 (new pcl::PointIndices());
+      ids2->indices = pointIdxRadiusSearch2;
+
+      pcl::ExtractIndices<pcl::PointXYZRGB> extract2;
+      extract2.setInputCloud (cloud_filtered);
+      extract2.setIndices (ids2);
+      extract2.setNegative (true);
+      extract2.filter (*cloud_sub2);
+      cloud_filtered.swap(cloud_sub2);
+
+
+      pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree3;
+      kdtree3.setInputCloud(cloud_filtered);
+      pcl::PointXYZRGB searchPoint3;
+      searchPoint3.x = point112.x -0.01;
+      searchPoint3.y = point112.y-0.30;
+      searchPoint3.z = point112.z-0.02;
+
+      std::vector<int> pointIdxRadiusSearch3;
+      std::vector<float> pointRadiusSquaredDistance3;
+      float radius3 = 0.15;
+      if ( kdtree3.radiusSearch (searchPoint3, radius3, pointIdxRadiusSearch3, pointRadiusSquaredDistance3) > 0 )
+        {
+//          for (size_t i = 0; i < pointIdxRadiusSearch3.size (); ++i)
+//            std::cout << "    "  <<   cloud_filtered->points[ pointIdxRadiusSearch3[i] ].x
+//                      << " " << cloud_filtered->points[ pointIdxRadiusSearch3[i] ].y
+//                      << " " << cloud_filtered->points[ pointIdxRadiusSearch3[i] ].z
+//                      << " (squared distance: " << pointRadiusSquaredDistance3[i] << ")" << std::endl
+//                      << "indices size: " << pointIdxRadiusSearch3.size() << std::endl;
+        }
+
+      pcl::PointIndices::Ptr ids3 (new pcl::PointIndices());
+      ids3->indices = pointIdxRadiusSearch3;
+
+      pcl::ExtractIndices<pcl::PointXYZRGB> extract3;
+      extract3.setInputCloud (cloud_filtered);
+      extract3.setIndices (ids3);
+      extract3.setNegative (true);
+      extract3.filter (*cloud_sub3);
+      cloud_filtered.swap(cloud_sub3);
+
+
+      pcl::KdTreeFLANN<pcl::PointXYZRGB> kdtree4;
+      kdtree4.setInputCloud(cloud_filtered);
+      pcl::PointXYZRGB searchPoint4;
+      searchPoint4.x = point21.x +0.1;
+      searchPoint4.y = point21.y-0.07;
+      searchPoint4.z = point21.z+0.2;
+
+      std::vector<int> pointIdxRadiusSearch4;
+      std::vector<float> pointRadiusSquaredDistance4;
+      float radius4 = 0.2;
+      if ( kdtree4.radiusSearch (searchPoint4, radius4, pointIdxRadiusSearch4, pointRadiusSquaredDistance4) > 0 )
+        {
+//          for (size_t i = 0; i < pointIdxRadiusSearch4.size (); ++i)
+//            std::cout << "    "  <<   cloud_filtered->points[ pointIdxRadiusSearch4[i] ].x
+//                      << " " << cloud_filtered->points[ pointIdxRadiusSearch4[i] ].y
+//                      << " " << cloud_filtered->points[ pointIdxRadiusSearch4[i] ].z
+//                      << " (squared distance: " << pointRadiusSquaredDistance4[i] << ")" << std::endl
+//                      << "indices size: " << pointIdxRadiusSearch4.size() << std::endl;
+        }
+
+      pcl::PointIndices::Ptr ids4 (new pcl::PointIndices());
+      ids4->indices = pointIdxRadiusSearch4;
+
+      pcl::ExtractIndices<pcl::PointXYZRGB> extract4;
+      extract4.setInputCloud (cloud_filtered);
+      extract4.setIndices (ids4);
+      extract4.setNegative (true);
+      extract4.filter (*cloud_sub4);
+      cloud_filtered.swap(cloud_sub4);
+
+
+//      pass.setInputCloud(cloud_filtered);
+//      pass.setFilterFieldName ("x");
+//      pass.setFilterLimits (minPoint[0], maxPoint[0]);
+//      pass.setFilterLimitsNegative (true);
+//      pass.filter(*cloud_filtered);
+
+//      pass.setInputCloud(cloud_filtered);
+//      pass.setFilterFieldName ("y");
+//      pass.setFilterLimits (minPoint[1], maxPoint[1]);
+//      pass.setFilterLimitsNegative (true);
+//      pass.filter(*cloud_filtered);
+
+//      pcl::CropBox<pcl::PointXYZRGB> boxFilter;
+//      //Eigen::Vector4f minPoint, maxPoint;
+//      Eigen::Vector3f boxTranslatation;
+//            boxTranslatation[0]=minPoint[0] +(maxPoint[0]-minPoint[0])/2;
+//            boxTranslatation[1]=minPoint[1] +(maxPoint[1]-minPoint[1])/2;
+//            boxTranslatation[2]=minPoint[2] +(maxPoint[2]-minPoint[2])/2;
+//      Eigen::Vector3f boxRotation;
+//            boxRotation[0]=0 * (M_PI/180);  // rotation around x-axis
+//            boxRotation[1]=0 * (M_PI/180);  // rotation around y-axis
+//            boxRotation[2]=0 * (M_PI/180);  //in radians rotation around z-axis. this rotates your cube 45deg around z-axis.
+//      Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+
+//      boxFilter.setInputCloud (cloud);
+//      boxFilter.setMin(point50.getVector4fMap());
+//      boxFilter.setMax(point57.getVector4fMap());
+//      boxFilter.setTranslation(boxTranslatation);
+//      boxFilter.setRotation(boxRotation);
+//      boxFilter.setTransform(transform);
+//      boxFilter.filter(*cloud_filtered);
+//      ROS_ERROR("Done the filter");
+//      ROS_INFO("point 22 x: %1.2f", point22.x);
+//      ROS_INFO("point 22 y: %1.2f", point22.y);
+//      ROS_INFO("point 22 z: %1.2f", point22.z);
+
+//      ROS_INFO("point 112 x: %1.2f", point112.x);
+//      ROS_INFO("point 112 y: %1.2f", point112.y);
+//      ROS_INFO("point 112 z: %1.2f", point112.z);
+
+//      ROS_INFO_STREAM("Msg: " << cloud->header.frame_id.c_str());
+//      ROS_INFO("%s", cloud->header.frame_id.c_str());
+//      ROS_INFO("%s", cloud_filtered->header.frame_id.c_str());
       //pcl::copyPointCloud(*cloud_filtered, *cloud);
 
 
@@ -879,31 +1034,6 @@ private:
 //          *cloud = *cloud_filtered;
 
 
-//        pcl::CropBox<pcl::PointXYZRGB> cropFilter;
-//        Eigen::Vector4f minPoint, maxPoint;
-//        minPoint[0] = 0.0;//x
-//        minPoint[1] = 0.0;//y
-//        minPoint[2] = 0.0;//z
-//        maxPoint[0] = 0.7;//x
-//        maxPoint[1] = 0.7;//y
-//        maxPoint[2] = 0.7;//z
-
-//        cropFilter.setInputCloud(cloud);
-//        cropFilter.setMin(minPoint);
-//        cropFilter.setMax(maxPoint);
-//        cropFilter.filter(*cloud);
-
-//        double radius = 0.02;
-//        double r = 255.0;
-//        double g = 15.0;
-//        double b = 15.0;
-//        double r1 = 0.0;
-//        double g1 = 255.0;
-//        double b1 = 0.0;
-//        double r2 = 255.0;
-//        double g2 = 0.0;
-//        double b2 = 0.0;
-      int viewport = 0;
 
 
 //        const std::string &id0 = "sphere0";
@@ -934,9 +1064,25 @@ private:
 //        const std::string &id22 = "sphere22";
 //        const std::string &id23 = "sphere23";
 //        const std::string &id24 = "sphere24";
+      //      boxFilter.setTranslation(boxTranslatation);
 
       visualizer->removeAllShapes();
 
+//      visualizer->addLine(point50, point51, r2, g2, b2, "line1", viewport);
+//      visualizer->addLine(point52, point53, r1, g1, b1, "line2", viewport);
+//      visualizer->addLine(point50, point52, r1, g1, b1, "line3", viewport);
+//      visualizer->addLine(point51, point53, r1, g1, b1, "line4", viewport);
+//      visualizer->addLine(point50, point54, r1, g1, b1, "line5", viewport);
+//      visualizer->addLine(point51, point55, r1, g1, b1, "line6", viewport);
+//      visualizer->addLine(point52, point56, r1, g1, b1, "line7", viewport);
+//      visualizer->addLine(point53, point57, r1, g1, b1, "line8", viewport);
+
+//      visualizer->addLine(point54, point55, r1, g1, b1, "line9", viewport);
+//      visualizer->addLine(point56, point57, r1, g1, b1, "line10", viewport);
+//      visualizer->addLine(point54, point56, r1, g1, b1, "line11", viewport);
+//      visualizer->addLine(point55, point57, r1, g1, b1, "line12", viewport);
+
+      //visualizer->addLine(searchPoint4, point21, r2, g2, b2, "line1", viewport);
 
 //        visualizer->addSphere(point0, radius, r, g, b, id0, viewport);
 //        visualizer->addSphere(point1, radius, r, g, b, id1, viewport);
@@ -985,7 +1131,9 @@ private:
 //        visualizer->addLine(point18, point19, r2, g2, b2, "line16", viewport);
 //        visualizer->addLine(point19, point20, r2, g2, b2, "line17", viewport);
 //        visualizer->addLine(point20, point22, r2, g2, b2, "line18", viewport);
+
       ROS_ERROR("ADD THE CINLYNDER TO POINT CLOUD");
+      double r = 0.055;
       pcl::ModelCoefficients cylinder_coeff1;
       cylinder_coeff1.values.resize(7);
       cylinder_coeff1.values[0] = point0.x;
@@ -994,7 +1142,7 @@ private:
       cylinder_coeff1.values[3] = point1.x - point0.x;
       cylinder_coeff1.values[4] = point1.y - point0.y;
       cylinder_coeff1.values[5] = point1.z - point0.z;
-      cylinder_coeff1.values[6] = 0.05;
+      cylinder_coeff1.values[6] = r;
       visualizer->addCylinder (cylinder_coeff1, "cylinder1", viewport);
 
       pcl::ModelCoefficients cylinder_coeff2;
@@ -1005,7 +1153,7 @@ private:
       cylinder_coeff2.values[3] = point2.x - point1.x;
       cylinder_coeff2.values[4] = point2.y - point1.y;
       cylinder_coeff2.values[5] = point2.z - point1.z;
-      cylinder_coeff2.values[6] = 0.05;
+      cylinder_coeff2.values[6] = r;
       visualizer->addCylinder (cylinder_coeff2, "cylinder2", viewport);
 
       pcl::ModelCoefficients cylinder_coeff3;
@@ -1016,7 +1164,7 @@ private:
       cylinder_coeff3.values[3] = point3.x - point2.x;
       cylinder_coeff3.values[4] = point3.y - point2.y;
       cylinder_coeff3.values[5] = point3.z - point2.z;
-      cylinder_coeff3.values[6] = 0.05;
+      cylinder_coeff3.values[6] = r;
       visualizer->addCylinder (cylinder_coeff3, "cylinder3", viewport);
 
       pcl::ModelCoefficients cylinder_coeff4;
@@ -1027,8 +1175,21 @@ private:
       cylinder_coeff4.values[3] = point4.x - point3.x;
       cylinder_coeff4.values[4] = point4.y - point3.y;
       cylinder_coeff4.values[5] = point4.z - point3.z;
-      cylinder_coeff4.values[6] = 0.05;
+      cylinder_coeff4.values[6] = r;
       visualizer->addCylinder (cylinder_coeff4, "cylinder4", viewport);
+
+
+//      pcl::ModelCoefficients cylinder_coeff40;
+//      cylinder_coeff40.values.resize(7);
+//      cylinder_coeff40.values[0] = point3.x;
+//      cylinder_coeff40.values[1] = point3.y - 0.1;
+//      cylinder_coeff40.values[2] = point3.z;
+//      cylinder_coeff40.values[3] = point4.x - point3.x;
+//      cylinder_coeff40.values[4] = point4.y - point3.y;
+//      cylinder_coeff40.values[5] = point4.z - point3.z;
+//      cylinder_coeff40.values[6] = 0.04;
+//      visualizer->addCylinder (cylinder_coeff40, "cylinder40", viewport);
+
 
       pcl::ModelCoefficients cylinder_coeff5;
       cylinder_coeff5.values.resize(7);
@@ -1038,7 +1199,7 @@ private:
       cylinder_coeff5.values[3] = point5.x - point4.x;
       cylinder_coeff5.values[4] = point5.y - point4.y;
       cylinder_coeff5.values[5] = point5.z - point4.z;
-      cylinder_coeff5.values[6] = 0.05;
+      cylinder_coeff5.values[6] = r;
       visualizer->addCylinder (cylinder_coeff5, "cylinder5", viewport);
 
       pcl::ModelCoefficients cylinder_coeff6;
@@ -1049,7 +1210,7 @@ private:
       cylinder_coeff6.values[3] = point6.x - point5.x;
       cylinder_coeff6.values[4] = point6.y - point5.y;
       cylinder_coeff6.values[5] = point6.z - point5.z;
-      cylinder_coeff6.values[6] = 0.05;
+      cylinder_coeff6.values[6] = r;
       visualizer->addCylinder (cylinder_coeff6, "cylinder6", viewport);
 
       pcl::ModelCoefficients cylinder_coeff7;
@@ -1060,7 +1221,7 @@ private:
       cylinder_coeff7.values[3] = point7.x - point6.x;
       cylinder_coeff7.values[4] = point7.y - point6.y;
       cylinder_coeff7.values[5] = point7.z - point6.z;
-      cylinder_coeff7.values[6] = 0.05;
+      cylinder_coeff7.values[6] = r;
       visualizer->addCylinder (cylinder_coeff7, "cylinder7", viewport);
 
       pcl::ModelCoefficients cylinder_coeff8;
@@ -1071,7 +1232,7 @@ private:
       cylinder_coeff8.values[3] = point8.x - point7.x;
       cylinder_coeff8.values[4] = point8.y - point7.y;
       cylinder_coeff8.values[5] = point8.z - point7.z;
-      cylinder_coeff8.values[6] = 0.05;
+      cylinder_coeff8.values[6] = r;
       visualizer->addCylinder (cylinder_coeff8, "cylinder8", viewport);
 
       pcl::ModelCoefficients cylinder_coeff9;
@@ -1082,7 +1243,7 @@ private:
       cylinder_coeff9.values[3] = point11.x - point8.x;
       cylinder_coeff9.values[4] = point11.y - point8.y;
       cylinder_coeff9.values[5] = point11.z - point8.z;
-      cylinder_coeff9.values[6] = 0.05;
+      cylinder_coeff9.values[6] = r;
       visualizer->addCylinder (cylinder_coeff9, "cylinder9", viewport);
 
       pcl::ModelCoefficients cylinder_coeff10;
@@ -1093,7 +1254,7 @@ private:
       cylinder_coeff10.values[3] = point110.x - point11.x;
       cylinder_coeff10.values[4] = point110.y - point11.y;
       cylinder_coeff10.values[5] = point110.z - point11.z;
-      cylinder_coeff10.values[6] = 0.05;
+      cylinder_coeff10.values[6] = r;
       visualizer->addCylinder (cylinder_coeff10, "cylinder10", viewport);
 
 
@@ -1106,7 +1267,7 @@ private:
       cylinder_coeff14.values[3] = point14.x - point12.x;
       cylinder_coeff14.values[4] = point14.y - point12.y;
       cylinder_coeff14.values[5] = point14.z - point12.z;
-      cylinder_coeff14.values[6] = 0.05;
+      cylinder_coeff14.values[6] = r;
       visualizer->addCylinder (cylinder_coeff14, "cylinder14", viewport);
 
       pcl::ModelCoefficients cylinder_coeff15;
@@ -1117,7 +1278,7 @@ private:
       cylinder_coeff15.values[3] = point15.x - point14.x;
       cylinder_coeff15.values[4] = point15.y - point14.y;
       cylinder_coeff15.values[5] = point15.z - point14.z;
-      cylinder_coeff15.values[6] = 0.05;
+      cylinder_coeff15.values[6] = r;
       visualizer->addCylinder (cylinder_coeff15, "cylinder15", viewport);
 
       pcl::ModelCoefficients cylinder_coeff16;
@@ -1128,7 +1289,7 @@ private:
       cylinder_coeff16.values[3] = point16.x - point15.x;
       cylinder_coeff16.values[4] = point16.y - point15.y;
       cylinder_coeff16.values[5] = point16.z - point15.z;
-      cylinder_coeff16.values[6] = 0.05;
+      cylinder_coeff16.values[6] = r;
       visualizer->addCylinder (cylinder_coeff16, "cylinder16", viewport);
 
       pcl::ModelCoefficients cylinder_coeff17;
@@ -1139,7 +1300,7 @@ private:
       cylinder_coeff17.values[3] = point17.x - point16.x;
       cylinder_coeff17.values[4] = point17.y - point16.y;
       cylinder_coeff17.values[5] = point17.z - point16.z;
-      cylinder_coeff17.values[6] = 0.05;
+      cylinder_coeff17.values[6] = r;
       visualizer->addCylinder (cylinder_coeff17, "cylinder17", viewport);
 
       pcl::ModelCoefficients cylinder_coeff18;
@@ -1150,7 +1311,7 @@ private:
       cylinder_coeff18.values[3] = point18.x - point17.x;
       cylinder_coeff18.values[4] = point18.y - point17.y;
       cylinder_coeff18.values[5] = point18.z - point17.z;
-      cylinder_coeff18.values[6] = 0.05;
+      cylinder_coeff18.values[6] = r;
       visualizer->addCylinder (cylinder_coeff18, "cylinder18", viewport);
 
       pcl::ModelCoefficients cylinder_coeff19;
@@ -1161,7 +1322,7 @@ private:
       cylinder_coeff19.values[3] = point19.x - point18.x;
       cylinder_coeff19.values[4] = point19.y - point18.y;
       cylinder_coeff19.values[5] = point19.z - point18.z;
-      cylinder_coeff19.values[6] = 0.05;
+      cylinder_coeff19.values[6] = r;
       visualizer->addCylinder (cylinder_coeff19, "cylinder19", viewport);
 
       pcl::ModelCoefficients cylinder_coeff20;
@@ -1172,7 +1333,7 @@ private:
       cylinder_coeff20.values[3] = point20.x - point19.x;
       cylinder_coeff20.values[4] = point20.y - point19.y;
       cylinder_coeff20.values[5] = point20.z - point19.z;
-      cylinder_coeff20.values[6] = 0.05;
+      cylinder_coeff20.values[6] = r;
       visualizer->addCylinder (cylinder_coeff20, "cylinder20", viewport);
 
       pcl::ModelCoefficients cylinder_coeff21;
@@ -1183,7 +1344,7 @@ private:
       cylinder_coeff21.values[3] = point22.x - point20.x;
       cylinder_coeff21.values[4] = point22.y - point20.y;
       cylinder_coeff21.values[5] = point22.z - point20.z;
-      cylinder_coeff21.values[6] = 0.05;
+      cylinder_coeff21.values[6] = r;
       visualizer->addCylinder (cylinder_coeff21, "cylinder21", viewport);
 
   }
@@ -1226,11 +1387,7 @@ private:
             lock.unlock();
 
             createCloud(depth, color, cloud);
-
-            // Create the filtering object
-//              pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered;
-//              cloud_filtered = pcl::PointCloud<pcl::PointXYZRGB>::Ptr(new pcl::PointCloud<pcl::PointXYZRGB>());
-//              //pcl::copyPointCloud(*cloud, *cloud_filtered);
+            //
 
             processMyCloud(visualizer);
 
@@ -1243,10 +1400,6 @@ private:
             dispDepth(depth, depthDisp, 12000.0f);
             saveCloudAndImages(cloud, color, depth, depthDisp);
           }
-
-        //Add
-
-
 
         visualizer->spinOnce(10);
       }
@@ -1410,13 +1563,6 @@ private:
 
   void js_callback(const sensor_msgs::JointState::ConstPtr& msg)
   {
-    //ROS_INFO("name received: %s", msg->name);
-    //ROS_INFO("position received: %f", msg->position);
-    //ROS_INFO("name received: %f", msg->effort);
-    //ROS_INFO("header received: %d", msg->header);
-    ROS_INFO_STREAM("Joint name 5 is: " << msg->name[5]);
-    ROS_INFO_STREAM("Joint value 5 is: " << msg->position[5]);
-
     joints.clear();
 
     joints.insert (std::pair<std::string,double>(msg->name[0],msg->position[0]));
@@ -1436,8 +1582,243 @@ private:
     joints.insert (std::pair<std::string,double>(msg->name[14],msg->position[14]));
     joints.insert (std::pair<std::string,double>(msg->name[15],msg->position[15]));
     //joints.insert (std::pair<std::string,double>(msg->name[16],msg->position[16]));
-
     kinematic_state->setVariablePositions (joints);
+
+//    const Eigen::Affine3d &joint_state0 = kinematic_state->getGlobalLinkTransform("left_base_link");
+//    const Eigen::Affine3d &joint_state1 = kinematic_state->getGlobalLinkTransform("left_shoulder_link");
+//    const Eigen::Affine3d &joint_state2 = kinematic_state->getGlobalLinkTransform("left_upper_arm_link");
+//    const Eigen::Affine3d &joint_state3 = kinematic_state->getGlobalLinkTransform("left_forearm_link");
+//    const Eigen::Affine3d &joint_state4 = kinematic_state->getGlobalLinkTransform("left_wrist_1_link");
+//    const Eigen::Affine3d &joint_state5 = kinematic_state->getGlobalLinkTransform("left_wrist_2_link");
+//    const Eigen::Affine3d &joint_state6 = kinematic_state->getGlobalLinkTransform("left_wrist_3_link");
+//    const Eigen::Affine3d &joint_state7 = kinematic_state->getGlobalLinkTransform("left_ee_link");
+//    const Eigen::Affine3d &joint_state8 = kinematic_state->getGlobalLinkTransform("left_base_link_gripper");
+//    const Eigen::Affine3d &joint_state9 = kinematic_state->getGlobalLinkTransform("left_ee_gripper_link");
+//    const Eigen::Affine3d &joint_state10 = kinematic_state->getGlobalLinkTransform("left_pi4_gripper_fixed_link");
+//    const Eigen::Affine3d &joint_state11 = kinematic_state->getGlobalLinkTransform("left_pi4_gripper_prismatic_link");
+//    const Eigen::Affine3d &joint_state110 = kinematic_state->getGlobalLinkTransform("left_pi4_gripper_finger1_link");
+//    const Eigen::Affine3d &joint_state111 = kinematic_state->getGlobalLinkTransform("left_pi4_gripper_finger2_link");
+//    const Eigen::Affine3d &joint_state112 = kinematic_state->getGlobalLinkTransform("left_ee_pi4_gripper_link");
+
+
+
+//    const Eigen::Affine3d &joint_state12 = kinematic_state->getGlobalLinkTransform("right_base_link");
+//    const Eigen::Affine3d &joint_state14 = kinematic_state->getGlobalLinkTransform("right_shoulder_link");
+//    const Eigen::Affine3d &joint_state15 = kinematic_state->getGlobalLinkTransform("right_upper_arm_link");
+//    const Eigen::Affine3d &joint_state16 = kinematic_state->getGlobalLinkTransform("right_forearm_link");
+//    const Eigen::Affine3d &joint_state17 = kinematic_state->getGlobalLinkTransform("right_wrist_1_link");
+//    const Eigen::Affine3d &joint_state18 = kinematic_state->getGlobalLinkTransform("right_wrist_2_link");
+//    const Eigen::Affine3d &joint_state19 = kinematic_state->getGlobalLinkTransform("right_wrist_3_link");
+//    const Eigen::Affine3d &joint_state20 = kinematic_state->getGlobalLinkTransform("right_ee_link");
+//    const Eigen::Affine3d &joint_state21 = kinematic_state->getGlobalLinkTransform("right_base_link_gripper");
+//    const Eigen::Affine3d &joint_state22 = kinematic_state->getGlobalLinkTransform("right_ee_gripper_link");
+//    const Eigen::Affine3d &joint_state23 = kinematic_state->getGlobalLinkTransform("Left_stereoCam_link");
+//    const Eigen::Affine3d &joint_state24 = kinematic_state->getGlobalLinkTransform("stereoCam_link");
+
+//    ROS_ERROR("store the translation data");
+
+//    double x0 = joint_state0.translation().x();
+//    double y0 = joint_state0.translation().y();
+//    double z0 = joint_state0.translation().z();
+
+//    double x1 = joint_state1.translation().x();
+//    double y1 = joint_state1.translation().y();
+//    double z1 = joint_state1.translation().z();
+
+//    double x2 = joint_state2.translation().x();
+//    double y2 = joint_state2.translation().y();
+//    double z2 = joint_state2.translation().z();
+
+//    double x3 = joint_state3.translation().x();
+//    double y3 = joint_state3.translation().y();
+//    double z3 = joint_state3.translation().z();
+
+//    double x4 = joint_state4.translation().x();
+//    double y4 = joint_state4.translation().y();
+//    double z4 = joint_state4.translation().z();
+
+//    double x5 = joint_state5.translation().x();
+//    double y5 = joint_state5.translation().y();
+//    double z5 = joint_state5.translation().z();
+
+//    double x6 = joint_state6.translation().x();
+//    double y6 = joint_state6.translation().y();
+//    double z6 = joint_state6.translation().z();
+
+//    double x7 = joint_state7.translation().x();
+//    double y7 = joint_state7.translation().y();
+//    double z7 = joint_state7.translation().z();
+
+//    double x8 = joint_state8.translation().x();
+//    double y8 = joint_state8.translation().y();
+//    double z8 = joint_state8.translation().z();
+
+//    double x9 = joint_state9.translation().x();
+//    double y9 = joint_state9.translation().y();
+//    double z9 = joint_state9.translation().z();
+
+//    double x10 = joint_state10.translation().x();
+//    double y10 = joint_state10.translation().y();
+//    double z10 = joint_state10.translation().z();
+
+//    double x11 = joint_state11.translation().x();
+//    double y11 = joint_state11.translation().y();
+//    double z11 = joint_state11.translation().z();
+
+//    double x110 = joint_state110.translation().x();
+//    double y110 = joint_state110.translation().y();
+//    double z110 = joint_state110.translation().z();
+
+//    double x111 = joint_state111.translation().x();
+//    double y111 = joint_state111.translation().y();
+//    double z111 = joint_state111.translation().z();
+
+//    double x112 = joint_state112.translation().x();
+//    double y112 = joint_state112.translation().y();
+//    double z112 = joint_state112.translation().z();
+
+//    double x12 = joint_state12.translation().x();
+//    double y12 = joint_state12.translation().y();
+//    double z12 = joint_state12.translation().z();
+
+//    double x14 = joint_state14.translation().x();
+//    double y14 = joint_state14.translation().y();
+//    double z14 = joint_state14.translation().z();
+
+//    double x15 = joint_state15.translation().x();
+//    double y15 = joint_state15.translation().y();
+//    double z15 = joint_state15.translation().z();
+
+//    double x16 = joint_state16.translation().x();
+//    double y16 = joint_state16.translation().y();
+//    double z16 = joint_state16.translation().z();
+
+//    double x17 = joint_state17.translation().x();
+//    double y17 = joint_state17.translation().y();
+//    double z17 = joint_state17.translation().z();
+
+//    double x18 = joint_state18.translation().x();
+//    double y18 = joint_state18.translation().y();
+//    double z18 = joint_state18.translation().z();
+
+//    double x19 = joint_state19.translation().x();
+//    double y19 = joint_state19.translation().y();
+//    double z19 = joint_state19.translation().z();
+
+//    double x20 = joint_state20.translation().x();
+//    double y20 = joint_state20.translation().y();
+//    double z20 = joint_state20.translation().z();
+
+//    double x21 = joint_state21.translation().x();
+//    double y21 = joint_state21.translation().y();
+//    double z21 = joint_state21.translation().z();
+
+//    double x22 = joint_state22.translation().x();
+//    double y22 = joint_state22.translation().y();
+//    double z22 = joint_state22.translation().z(); //hard coded because values from vision are not always reliable
+
+//    double roll3, pitch3, yaw3;
+//    tf::Matrix3x3 matrix3;
+//    Eigen::Matrix3d link_orientation3 = joint_state3.rotation();
+//    tf::matrixEigenToTF(link_orientation3, matrix3);
+
+//    matrix3.getRPY(roll3, pitch3, yaw3);
+//    ROS_INFO("roll 3: %1.2f", roll3);
+//    ROS_INFO("pitch 3: %1.2f", pitch3);
+//    ROS_INFO("raw 3: %1.2f", yaw3);
+
+//    double l_roll_deg3=195;//180
+//    double l_pitch_deg3=35;//30.37
+//    double l_yaw_deg3=180;//171.31
+
+//    double l_roll_rad3 = l_roll_deg3 * (M_PI/180);
+//    double l_pitch_rad3 = l_pitch_deg3 * (M_PI/180);
+//    double l_yaw_rad3 = l_yaw_deg3 * (M_PI/180);
+
+//    tf::Quaternion l_q3;
+//    l_q3.setRPY(l_roll_rad3, l_pitch_rad3, l_yaw_rad3);
+//    Eigen::Affine3d left_pose3 = Eigen::Translation3d(x3, y3, z3)
+//        * Eigen::Quaterniond(l_q3);
+//    kinematic_state->updateStateWithLinkAt("left_forearm_link", left_pose3);
+
+////-----------------------------
+
+//    double roll5, pitch5, yaw5;
+//    tf::Matrix3x3 matrix5;
+//    Eigen::Matrix3d link_orientation5 = joint_state5.rotation();
+//    tf::matrixEigenToTF(link_orientation5, matrix5);
+
+//    matrix5.getRPY(roll5, pitch5, yaw5);
+//    ROS_INFO("roll 5: %1.2f", roll5);//-143.81
+//    ROS_INFO("pitch 5: %1.2f", pitch5);//-12.03
+//    ROS_INFO("raw 5: %1.2f", yaw5);//-98.55
+
+//    double l_roll_deg5=-84.80;//-84.80
+//    double l_pitch_deg5=-15.03;//-12.03
+//    double l_yaw_deg5=-90.55;//-98.55
+
+//    double l_roll_rad5 = l_roll_deg5 * (M_PI/180);
+//    double l_pitch_rad5 = l_pitch_deg5 * (M_PI/180);
+//    double l_yaw_rad5 = l_yaw_deg5 * (M_PI/180);
+
+//    tf::Quaternion l_q5;
+//    l_q5.setRPY(l_roll_rad5, l_pitch_rad5, l_yaw_rad5);
+//    Eigen::Affine3d left_pose5 = Eigen::Translation3d(x5, y5, z5)
+//        * Eigen::Quaterniond(l_q5);
+//    kinematic_state->updateStateWithLinkAt("left_wrist_2_link", left_pose5);
+
+
+
+//    //-------------------------
+//    double roll16, pitch16, yaw16;
+//    tf::Matrix3x3 matrix16;
+//    Eigen::Matrix3d link_orientation16 = joint_state16.rotation();
+//    tf::matrixEigenToTF(link_orientation16, matrix16);
+
+//    matrix16.getRPY(roll16, pitch16, yaw16);
+//    ROS_INFO("roll 16: %1.2f", roll16);
+//    ROS_INFO("pitch 16: %1.2f", pitch16);
+//    ROS_INFO("raw 16: %1.2f", yaw16);
+
+//    double l_roll_deg16= 180;//180
+//    double l_pitch_deg16=-42.39;//-38.39
+//    double l_yaw_deg16=15.47;//15.47
+
+//    double l_roll_rad16 = l_roll_deg16 * (M_PI/180);
+//    double l_pitch_rad16 = l_pitch_deg16 * (M_PI/180);
+//    double l_yaw_rad16 = l_yaw_deg16 * (M_PI/180);
+
+//    tf::Quaternion l_q16;
+//    l_q16.setRPY(l_roll_rad16, l_pitch_rad16, l_yaw_rad16);
+//    Eigen::Affine3d left_pose16 = Eigen::Translation3d(x16, y16, z16)
+//        * Eigen::Quaterniond(l_q16);
+//    kinematic_state->updateStateWithLinkAt("right_forearm_link", left_pose16);
+
+//    //--------------------------------
+//    double roll18, pitch18, yaw18;
+//    tf::Matrix3x3 matrix18;
+//    Eigen::Matrix3d link_orientation18 = joint_state18.rotation();
+//    tf::matrixEigenToTF(link_orientation18, matrix18);
+
+//    matrix18.getRPY(roll18, pitch18, yaw18);
+//    ROS_INFO("roll 18: %1.2f", roll18);
+//    ROS_INFO("pitch 18: %1.2f", pitch18);
+//    ROS_INFO("raw 18: %1.2f", yaw18);
+
+//    double l_roll_deg18= -89.38;//-89.38
+//    double l_pitch_deg18=-0.00;//-0.00
+//    double l_yaw_deg18=-87.50;//-78.50
+
+//    double l_roll_rad18 = l_roll_deg18 * (M_PI/180);
+//    double l_pitch_rad18 = l_pitch_deg18 * (M_PI/180);
+//    double l_yaw_rad18 = l_yaw_deg18 * (M_PI/180);
+
+//    tf::Quaternion l_q18;
+//    l_q18.setRPY(l_roll_rad18, l_pitch_rad18, l_yaw_rad18);
+//    Eigen::Affine3d left_pose18 = Eigen::Translation3d(x18, y18, z18)
+//        * Eigen::Quaterniond(l_q18);
+//    kinematic_state->updateStateWithLinkAt("right_wrist_2_link", left_pose18);
+
     kinematic_state->update();
 
   }
