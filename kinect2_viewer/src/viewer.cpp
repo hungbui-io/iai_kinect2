@@ -153,20 +153,6 @@ public:
     params.push_back(cv::IMWRITE_PNG_STRATEGY_RLE);
     params.push_back(0);
 
-    //    for(int i = 0; i < joints.size(); ++i) {
-    //        Map::iterator it = joints.begin();
-    //        //std::advance(it, i);
-    //        ROS_INFO_STREAM("%s " << it->first);
-    //        ROS_INFO_STREAM("%f " << it->second);}
-
-    //    std::map<string, float>::iterator it;
-
-    //    for(it=joints.begin();it!=joints.end();it++)
-    //    {
-    //        std::cout<<it->first<<std::endl;
-    //        std::cout<<it->second<<std::endl;
-    //    }
-    //add
     js_sub = nh.subscribe("/joint_states", 10, &Receiver::js_callback, this);
     robot_model_loader = robot_model_loader::RobotModelLoader ("robot_description");
     kinematic_model = robot_model_loader.getModel();
@@ -176,26 +162,6 @@ public:
     //const robot_state::JointModelGroup* joint_model_group1 = kinematic_model->getJointModelGroup("Robot");
     kinematic_model->getJointModelGroup("Robot");
     kinematic_model->getJointModelGroup("Left_SideGripper");
-
-//    joints["left_elbow_joint"] = 1.362766;
-//    joints["left_shoulder_lift_joint"] = -0.323989;
-//    joints["left_shoulder_pan_joint"] = -1.721952;
-//    joints["left_wrist_1_joint"] = -2.609463;
-//    joints["left_wrist_2_joint"] = -1.570665;
-//    joints["left_wrist_3_joint"] = -0.151294;
-//    //joints["left_joint_vaccum_ee"] = 0.000000;
-
-//    joints["left_pi4_gripper_prismatic_joint"] = 0.003000;
-//    joints["left_pi4_gripper_finger1_joint"] = 0.009200;
-//    joints["left_pi4_gripper_finger2_joint"] = -0.009200;
-
-//    joints["right_elbow_joint"] = -1.163788;
-//    joints["right_shoulder_lift_joint"] = -2.888825;
-//    joints["right_shoulder_pan_joint"] = 1.762168;
-//    joints["right_wrist_1_joint"] = -0.659665;
-//    joints["right_wrist_2_joint"] = 1.570607;
-//    joints["right_wrist_3_joint"] = 0.191639;
-    // joints["right_joint_vaccum_ee"] = 0.000000;
 
     //kinematic_state->setVariablePositions (joints);
 
@@ -437,10 +403,7 @@ private:
       const Eigen::Affine3d &joint_state20 = kinematic_state->getGlobalLinkTransform("right_ee_link");
       const Eigen::Affine3d &joint_state21 = kinematic_state->getGlobalLinkTransform("right_base_link_gripper");
       const Eigen::Affine3d &joint_state22 = kinematic_state->getGlobalLinkTransform("right_ee_gripper_link");
-      const Eigen::Affine3d &joint_state23 = kinematic_state->getGlobalLinkTransform("Left_stereoCam_link");
-      const Eigen::Affine3d &joint_state24 = kinematic_state->getGlobalLinkTransform("stereoCam_link");
 
-      ROS_ERROR("store the translation data");
 
       double x0 = joint_state0.translation().x();
       double y0 = joint_state0.translation().y();
@@ -540,15 +503,7 @@ private:
 
       double x22 = joint_state22.translation().x();
       double y22 = joint_state22.translation().y();
-      double z22 = joint_state22.translation().z(); //hard coded because values from vision are not always reliable
-
-
-//        ROS_INFO_STREAM("Rotation left_pose: " << left_pose3.rotation());
-//        ROS_INFO_STREAM("Translation: " << joint_state20.translation());
-//        ROS_INFO_STREAM("Rotation: " << joint_state20.rotation());
-//        ROS_INFO_STREAM("Translation: " << l_q);
-
-
+      double z22 = joint_state22.translation().z();
 
 
       //      Eigen::Matrix4d matrix23 = joint_state23.matrix();
@@ -691,14 +646,7 @@ private:
       pt22.point.y = y22;
       pt22.point.z = z22;
 
-      //            pt23.point.x = matrix23(0, 3);
-      //            pt23.point.y = matrix23(1, 3);
-      //            pt23.point.z = matrix23(2, 3);
 
-      //            pt24.point.x = matrix24(0, 3);
-      //            pt24.point.y = matrix24(1, 3);
-      //            pt24.point.z = matrix24(2, 3);
-      ROS_ERROR("Do the transform");
       tf_listener_.transformPoint("/kinect2_frame", pt0, pt0_);
       tf_listener_.transformPoint("/kinect2_frame", pt1, pt1_);
       tf_listener_.transformPoint("/kinect2_frame", pt2, pt2_);
@@ -841,16 +789,6 @@ private:
       point24.y = pt24_.point.y;
       point24.z = pt24_.point.z;
 
-      //        double radius = 0.02;
-//              double r = 255.0;
-//              double g = 15.0;
-//              double b = 15.0;
-//              double r1 = 0.0;
-//              double g1 = 255.0;
-//              double b1 = 0.0;
-//              double r2 = 255.0;
-//              double g2 = 0.0;
-//              double b2 = 0.0;
             int viewport = 0;
 
       pcl::PassThrough<pcl::PointXYZRGB> pass;
@@ -984,155 +922,8 @@ private:
       cloud_filtered.swap(cloud_sub4);
 
 
-//      pass.setInputCloud(cloud_filtered);
-//      pass.setFilterFieldName ("x");
-//      pass.setFilterLimits (minPoint[0], maxPoint[0]);
-//      pass.setFilterLimitsNegative (true);
-//      pass.filter(*cloud_filtered);
-
-//      pass.setInputCloud(cloud_filtered);
-//      pass.setFilterFieldName ("y");
-//      pass.setFilterLimits (minPoint[1], maxPoint[1]);
-//      pass.setFilterLimitsNegative (true);
-//      pass.filter(*cloud_filtered);
-
-//      pcl::CropBox<pcl::PointXYZRGB> boxFilter;
-//      //Eigen::Vector4f minPoint, maxPoint;
-//      Eigen::Vector3f boxTranslatation;
-//            boxTranslatation[0]=minPoint[0] +(maxPoint[0]-minPoint[0])/2;
-//            boxTranslatation[1]=minPoint[1] +(maxPoint[1]-minPoint[1])/2;
-//            boxTranslatation[2]=minPoint[2] +(maxPoint[2]-minPoint[2])/2;
-//      Eigen::Vector3f boxRotation;
-//            boxRotation[0]=0 * (M_PI/180);  // rotation around x-axis
-//            boxRotation[1]=0 * (M_PI/180);  // rotation around y-axis
-//            boxRotation[2]=0 * (M_PI/180);  //in radians rotation around z-axis. this rotates your cube 45deg around z-axis.
-//      Eigen::Affine3f transform = Eigen::Affine3f::Identity();
-
-//      boxFilter.setInputCloud (cloud);
-//      boxFilter.setMin(point50.getVector4fMap());
-//      boxFilter.setMax(point57.getVector4fMap());
-//      boxFilter.setTranslation(boxTranslatation);
-//      boxFilter.setRotation(boxRotation);
-//      boxFilter.setTransform(transform);
-//      boxFilter.filter(*cloud_filtered);
-//      ROS_ERROR("Done the filter");
-//      ROS_INFO("point 22 x: %1.2f", point22.x);
-//      ROS_INFO("point 22 y: %1.2f", point22.y);
-//      ROS_INFO("point 22 z: %1.2f", point22.z);
-
-//      ROS_INFO("point 112 x: %1.2f", point112.x);
-//      ROS_INFO("point 112 y: %1.2f", point112.y);
-//      ROS_INFO("point 112 z: %1.2f", point112.z);
-
-//      ROS_INFO_STREAM("Msg: " << cloud->header.frame_id.c_str());
-//      ROS_INFO("%s", cloud->header.frame_id.c_str());
-//      ROS_INFO("%s", cloud_filtered->header.frame_id.c_str());
-      //pcl::copyPointCloud(*cloud_filtered, *cloud);
-
-
-//          pcl::copyPointCloud(*cloud_filtered, *cloud);
-//          *cloud = *cloud_filtered;
-
-
-
-
-//        const std::string &id0 = "sphere0";
-//        const std::string &id1 = "sphere1";
-//        const std::string &id2 = "sphere2";
-//        const std::string &id3 = "sphere3";
-//        const std::string &id4 = "sphere4";
-//        const std::string &id5 = "sphere5";
-//        const std::string &id6 = "sphere6";
-//        const std::string &id7 = "sphere7";
-//        const std::string &id8 = "sphere8";
-//        const std::string &id9 = "sphere9";
-//        const std::string &id10 = "sphere10";
-//        const std::string &id11 = "sphere11";
-//        const std::string &id110 = "sphere110";
-//        const std::string &id111 = "sphere111";
-//        const std::string &id112 = "sphere112";
-
-//        const std::string &id12 = "sphere12";
-//        const std::string &id14 = "sphere14";
-//        const std::string &id15 = "sphere15";
-//        const std::string &id16 = "sphere16";
-//        const std::string &id17 = "sphere17";
-//        const std::string &id18 = "sphere18";
-//        const std::string &id19 = "sphere19";
-//        const std::string &id20 = "sphere20";
-//        const std::string &id21 = "sphere21";
-//        const std::string &id22 = "sphere22";
-//        const std::string &id23 = "sphere23";
-//        const std::string &id24 = "sphere24";
-      //      boxFilter.setTranslation(boxTranslatation);
-
       visualizer->removeAllShapes();
 
-//      visualizer->addLine(point50, point51, r2, g2, b2, "line1", viewport);
-//      visualizer->addLine(point52, point53, r1, g1, b1, "line2", viewport);
-//      visualizer->addLine(point50, point52, r1, g1, b1, "line3", viewport);
-//      visualizer->addLine(point51, point53, r1, g1, b1, "line4", viewport);
-//      visualizer->addLine(point50, point54, r1, g1, b1, "line5", viewport);
-//      visualizer->addLine(point51, point55, r1, g1, b1, "line6", viewport);
-//      visualizer->addLine(point52, point56, r1, g1, b1, "line7", viewport);
-//      visualizer->addLine(point53, point57, r1, g1, b1, "line8", viewport);
-
-//      visualizer->addLine(point54, point55, r1, g1, b1, "line9", viewport);
-//      visualizer->addLine(point56, point57, r1, g1, b1, "line10", viewport);
-//      visualizer->addLine(point54, point56, r1, g1, b1, "line11", viewport);
-//      visualizer->addLine(point55, point57, r1, g1, b1, "line12", viewport);
-
-      //visualizer->addLine(searchPoint4, point21, r2, g2, b2, "line1", viewport);
-
-//        visualizer->addSphere(point0, radius, r, g, b, id0, viewport);
-//        visualizer->addSphere(point1, radius, r, g, b, id1, viewport);
-//        visualizer->addSphere(point2, radius, r, g, b, id2, viewport);
-//        visualizer->addSphere(point3, radius, r, g, b, id3, viewport);
-//        visualizer->addSphere(point4, radius, r, g, b, id4, viewport);
-//        visualizer->addSphere(point5, radius, r, g, b, id5, viewport);
-//        visualizer->addSphere(point6, radius, r, g, b, id6, viewport);
-//        visualizer->addSphere(point7, radius, r, g, b, id7, viewport);
-//        //visualizer->addSphere(point8, radius, r, g, b, id8, viewport);
-//        visualizer->addSphere(point9, radius, r, g, b, id9, viewport);
-//        visualizer->addSphere(point10, radius, r, g, b, id10, viewport);
-//        visualizer->addSphere(point11, radius, r, g, b, id11, viewport);
-//        visualizer->addSphere(point110, radius, r, g, b, id110, viewport);
-//        visualizer->addSphere(point111, radius, r, g, b, id111, viewport);
-//        visualizer->addSphere(point112, radius, r, g, b, id112, viewport);
-
-//        visualizer->addLine(point0, point1, r1, g1, b1, "line1", viewport);
-//        visualizer->addLine(point1, point2, r1, g1, b1, "line2", viewport);
-//        visualizer->addLine(point2, point3, r1, g1, b1, "line3", viewport);
-//        visualizer->addLine(point3, point4, r1, g1, b1, "line4", viewport);
-//        visualizer->addLine(point4, point5, r1, g1, b1, "line5", viewport);
-//        visualizer->addLine(point5, point6, r1, g1, b1, "line6", viewport);
-//        visualizer->addLine(point6, point7, r1, g1, b1, "line7", viewport);
-//        visualizer->addLine(point7, point8, r1, g1, b1, "line8", viewport);
-//        visualizer->addLine(point8, point11, r1, g1, b1, "line9", viewport);
-
-//        visualizer->addSphere(point12, radius, r, g, b, id12, viewport);
-//        visualizer->addSphere(point14, radius, r, g, b, id14, viewport);
-//        visualizer->addSphere(point15, radius, r, g, b, id15, viewport);
-//        visualizer->addSphere(point16, radius, r, g, b, id16, viewport);
-//        visualizer->addSphere(point17, radius, r, g, b, id17, viewport);
-//        visualizer->addSphere(point18, radius, r, g, b, id18, viewport);
-//        visualizer->addSphere(point19, radius, r, g, b, id19, viewport);
-//        visualizer->addSphere(point20, radius, r, g, b, id20, viewport);
-//        //      visualizer->addSphere(point21, radius, r, g, b, id21, viewport);
-//        visualizer->addSphere(point22, radius, r, g, b, id22, viewport);
-//        visualizer->addSphere(point23, radius, r, g, b, id23, viewport);
-//        //      visualizer->addSphere(point24, radius, r, g, b, id24, viewport);
-
-//        visualizer->addLine(point12, point14, r2, g2, b2, "line10", viewport);
-//        visualizer->addLine(point14, point15, r2, g2, b2, "line11", viewport);
-//        visualizer->addLine(point15, point16, r2, g2, b2, "line12", viewport);
-//        visualizer->addLine(point16, point17, r2, g2, b2, "line14", viewport);
-//        visualizer->addLine(point17, point18, r2, g2, b2, "line15", viewport);
-//        visualizer->addLine(point18, point19, r2, g2, b2, "line16", viewport);
-//        visualizer->addLine(point19, point20, r2, g2, b2, "line17", viewport);
-//        visualizer->addLine(point20, point22, r2, g2, b2, "line18", viewport);
-
-      ROS_ERROR("ADD THE CINLYNDER TO POINT CLOUD");
       double r = 0.055;
       pcl::ModelCoefficients cylinder_coeff1;
       cylinder_coeff1.values.resize(7);
@@ -1177,18 +968,6 @@ private:
       cylinder_coeff4.values[5] = point4.z - point3.z;
       cylinder_coeff4.values[6] = r;
       visualizer->addCylinder (cylinder_coeff4, "cylinder4", viewport);
-
-
-//      pcl::ModelCoefficients cylinder_coeff40;
-//      cylinder_coeff40.values.resize(7);
-//      cylinder_coeff40.values[0] = point3.x;
-//      cylinder_coeff40.values[1] = point3.y - 0.1;
-//      cylinder_coeff40.values[2] = point3.z;
-//      cylinder_coeff40.values[3] = point4.x - point3.x;
-//      cylinder_coeff40.values[4] = point4.y - point3.y;
-//      cylinder_coeff40.values[5] = point4.z - point3.z;
-//      cylinder_coeff40.values[6] = 0.04;
-//      visualizer->addCylinder (cylinder_coeff40, "cylinder40", viewport);
 
 
       pcl::ModelCoefficients cylinder_coeff5;
@@ -1583,244 +1362,7 @@ private:
     joints.insert (std::pair<std::string,double>(msg->name[15],msg->position[15]));
     //joints.insert (std::pair<std::string,double>(msg->name[16],msg->position[16]));
     kinematic_state->setVariablePositions (joints);
-
-//    const Eigen::Affine3d &joint_state0 = kinematic_state->getGlobalLinkTransform("left_base_link");
-//    const Eigen::Affine3d &joint_state1 = kinematic_state->getGlobalLinkTransform("left_shoulder_link");
-//    const Eigen::Affine3d &joint_state2 = kinematic_state->getGlobalLinkTransform("left_upper_arm_link");
-//    const Eigen::Affine3d &joint_state3 = kinematic_state->getGlobalLinkTransform("left_forearm_link");
-//    const Eigen::Affine3d &joint_state4 = kinematic_state->getGlobalLinkTransform("left_wrist_1_link");
-//    const Eigen::Affine3d &joint_state5 = kinematic_state->getGlobalLinkTransform("left_wrist_2_link");
-//    const Eigen::Affine3d &joint_state6 = kinematic_state->getGlobalLinkTransform("left_wrist_3_link");
-//    const Eigen::Affine3d &joint_state7 = kinematic_state->getGlobalLinkTransform("left_ee_link");
-//    const Eigen::Affine3d &joint_state8 = kinematic_state->getGlobalLinkTransform("left_base_link_gripper");
-//    const Eigen::Affine3d &joint_state9 = kinematic_state->getGlobalLinkTransform("left_ee_gripper_link");
-//    const Eigen::Affine3d &joint_state10 = kinematic_state->getGlobalLinkTransform("left_pi4_gripper_fixed_link");
-//    const Eigen::Affine3d &joint_state11 = kinematic_state->getGlobalLinkTransform("left_pi4_gripper_prismatic_link");
-//    const Eigen::Affine3d &joint_state110 = kinematic_state->getGlobalLinkTransform("left_pi4_gripper_finger1_link");
-//    const Eigen::Affine3d &joint_state111 = kinematic_state->getGlobalLinkTransform("left_pi4_gripper_finger2_link");
-//    const Eigen::Affine3d &joint_state112 = kinematic_state->getGlobalLinkTransform("left_ee_pi4_gripper_link");
-
-
-
-//    const Eigen::Affine3d &joint_state12 = kinematic_state->getGlobalLinkTransform("right_base_link");
-//    const Eigen::Affine3d &joint_state14 = kinematic_state->getGlobalLinkTransform("right_shoulder_link");
-//    const Eigen::Affine3d &joint_state15 = kinematic_state->getGlobalLinkTransform("right_upper_arm_link");
-//    const Eigen::Affine3d &joint_state16 = kinematic_state->getGlobalLinkTransform("right_forearm_link");
-//    const Eigen::Affine3d &joint_state17 = kinematic_state->getGlobalLinkTransform("right_wrist_1_link");
-//    const Eigen::Affine3d &joint_state18 = kinematic_state->getGlobalLinkTransform("right_wrist_2_link");
-//    const Eigen::Affine3d &joint_state19 = kinematic_state->getGlobalLinkTransform("right_wrist_3_link");
-//    const Eigen::Affine3d &joint_state20 = kinematic_state->getGlobalLinkTransform("right_ee_link");
-//    const Eigen::Affine3d &joint_state21 = kinematic_state->getGlobalLinkTransform("right_base_link_gripper");
-//    const Eigen::Affine3d &joint_state22 = kinematic_state->getGlobalLinkTransform("right_ee_gripper_link");
-//    const Eigen::Affine3d &joint_state23 = kinematic_state->getGlobalLinkTransform("Left_stereoCam_link");
-//    const Eigen::Affine3d &joint_state24 = kinematic_state->getGlobalLinkTransform("stereoCam_link");
-
-//    ROS_ERROR("store the translation data");
-
-//    double x0 = joint_state0.translation().x();
-//    double y0 = joint_state0.translation().y();
-//    double z0 = joint_state0.translation().z();
-
-//    double x1 = joint_state1.translation().x();
-//    double y1 = joint_state1.translation().y();
-//    double z1 = joint_state1.translation().z();
-
-//    double x2 = joint_state2.translation().x();
-//    double y2 = joint_state2.translation().y();
-//    double z2 = joint_state2.translation().z();
-
-//    double x3 = joint_state3.translation().x();
-//    double y3 = joint_state3.translation().y();
-//    double z3 = joint_state3.translation().z();
-
-//    double x4 = joint_state4.translation().x();
-//    double y4 = joint_state4.translation().y();
-//    double z4 = joint_state4.translation().z();
-
-//    double x5 = joint_state5.translation().x();
-//    double y5 = joint_state5.translation().y();
-//    double z5 = joint_state5.translation().z();
-
-//    double x6 = joint_state6.translation().x();
-//    double y6 = joint_state6.translation().y();
-//    double z6 = joint_state6.translation().z();
-
-//    double x7 = joint_state7.translation().x();
-//    double y7 = joint_state7.translation().y();
-//    double z7 = joint_state7.translation().z();
-
-//    double x8 = joint_state8.translation().x();
-//    double y8 = joint_state8.translation().y();
-//    double z8 = joint_state8.translation().z();
-
-//    double x9 = joint_state9.translation().x();
-//    double y9 = joint_state9.translation().y();
-//    double z9 = joint_state9.translation().z();
-
-//    double x10 = joint_state10.translation().x();
-//    double y10 = joint_state10.translation().y();
-//    double z10 = joint_state10.translation().z();
-
-//    double x11 = joint_state11.translation().x();
-//    double y11 = joint_state11.translation().y();
-//    double z11 = joint_state11.translation().z();
-
-//    double x110 = joint_state110.translation().x();
-//    double y110 = joint_state110.translation().y();
-//    double z110 = joint_state110.translation().z();
-
-//    double x111 = joint_state111.translation().x();
-//    double y111 = joint_state111.translation().y();
-//    double z111 = joint_state111.translation().z();
-
-//    double x112 = joint_state112.translation().x();
-//    double y112 = joint_state112.translation().y();
-//    double z112 = joint_state112.translation().z();
-
-//    double x12 = joint_state12.translation().x();
-//    double y12 = joint_state12.translation().y();
-//    double z12 = joint_state12.translation().z();
-
-//    double x14 = joint_state14.translation().x();
-//    double y14 = joint_state14.translation().y();
-//    double z14 = joint_state14.translation().z();
-
-//    double x15 = joint_state15.translation().x();
-//    double y15 = joint_state15.translation().y();
-//    double z15 = joint_state15.translation().z();
-
-//    double x16 = joint_state16.translation().x();
-//    double y16 = joint_state16.translation().y();
-//    double z16 = joint_state16.translation().z();
-
-//    double x17 = joint_state17.translation().x();
-//    double y17 = joint_state17.translation().y();
-//    double z17 = joint_state17.translation().z();
-
-//    double x18 = joint_state18.translation().x();
-//    double y18 = joint_state18.translation().y();
-//    double z18 = joint_state18.translation().z();
-
-//    double x19 = joint_state19.translation().x();
-//    double y19 = joint_state19.translation().y();
-//    double z19 = joint_state19.translation().z();
-
-//    double x20 = joint_state20.translation().x();
-//    double y20 = joint_state20.translation().y();
-//    double z20 = joint_state20.translation().z();
-
-//    double x21 = joint_state21.translation().x();
-//    double y21 = joint_state21.translation().y();
-//    double z21 = joint_state21.translation().z();
-
-//    double x22 = joint_state22.translation().x();
-//    double y22 = joint_state22.translation().y();
-//    double z22 = joint_state22.translation().z(); //hard coded because values from vision are not always reliable
-
-//    double roll3, pitch3, yaw3;
-//    tf::Matrix3x3 matrix3;
-//    Eigen::Matrix3d link_orientation3 = joint_state3.rotation();
-//    tf::matrixEigenToTF(link_orientation3, matrix3);
-
-//    matrix3.getRPY(roll3, pitch3, yaw3);
-//    ROS_INFO("roll 3: %1.2f", roll3);
-//    ROS_INFO("pitch 3: %1.2f", pitch3);
-//    ROS_INFO("raw 3: %1.2f", yaw3);
-
-//    double l_roll_deg3=195;//180
-//    double l_pitch_deg3=35;//30.37
-//    double l_yaw_deg3=180;//171.31
-
-//    double l_roll_rad3 = l_roll_deg3 * (M_PI/180);
-//    double l_pitch_rad3 = l_pitch_deg3 * (M_PI/180);
-//    double l_yaw_rad3 = l_yaw_deg3 * (M_PI/180);
-
-//    tf::Quaternion l_q3;
-//    l_q3.setRPY(l_roll_rad3, l_pitch_rad3, l_yaw_rad3);
-//    Eigen::Affine3d left_pose3 = Eigen::Translation3d(x3, y3, z3)
-//        * Eigen::Quaterniond(l_q3);
-//    kinematic_state->updateStateWithLinkAt("left_forearm_link", left_pose3);
-
-////-----------------------------
-
-//    double roll5, pitch5, yaw5;
-//    tf::Matrix3x3 matrix5;
-//    Eigen::Matrix3d link_orientation5 = joint_state5.rotation();
-//    tf::matrixEigenToTF(link_orientation5, matrix5);
-
-//    matrix5.getRPY(roll5, pitch5, yaw5);
-//    ROS_INFO("roll 5: %1.2f", roll5);//-143.81
-//    ROS_INFO("pitch 5: %1.2f", pitch5);//-12.03
-//    ROS_INFO("raw 5: %1.2f", yaw5);//-98.55
-
-//    double l_roll_deg5=-84.80;//-84.80
-//    double l_pitch_deg5=-15.03;//-12.03
-//    double l_yaw_deg5=-90.55;//-98.55
-
-//    double l_roll_rad5 = l_roll_deg5 * (M_PI/180);
-//    double l_pitch_rad5 = l_pitch_deg5 * (M_PI/180);
-//    double l_yaw_rad5 = l_yaw_deg5 * (M_PI/180);
-
-//    tf::Quaternion l_q5;
-//    l_q5.setRPY(l_roll_rad5, l_pitch_rad5, l_yaw_rad5);
-//    Eigen::Affine3d left_pose5 = Eigen::Translation3d(x5, y5, z5)
-//        * Eigen::Quaterniond(l_q5);
-//    kinematic_state->updateStateWithLinkAt("left_wrist_2_link", left_pose5);
-
-
-
-//    //-------------------------
-//    double roll16, pitch16, yaw16;
-//    tf::Matrix3x3 matrix16;
-//    Eigen::Matrix3d link_orientation16 = joint_state16.rotation();
-//    tf::matrixEigenToTF(link_orientation16, matrix16);
-
-//    matrix16.getRPY(roll16, pitch16, yaw16);
-//    ROS_INFO("roll 16: %1.2f", roll16);
-//    ROS_INFO("pitch 16: %1.2f", pitch16);
-//    ROS_INFO("raw 16: %1.2f", yaw16);
-
-//    double l_roll_deg16= 180;//180
-//    double l_pitch_deg16=-42.39;//-38.39
-//    double l_yaw_deg16=15.47;//15.47
-
-//    double l_roll_rad16 = l_roll_deg16 * (M_PI/180);
-//    double l_pitch_rad16 = l_pitch_deg16 * (M_PI/180);
-//    double l_yaw_rad16 = l_yaw_deg16 * (M_PI/180);
-
-//    tf::Quaternion l_q16;
-//    l_q16.setRPY(l_roll_rad16, l_pitch_rad16, l_yaw_rad16);
-//    Eigen::Affine3d left_pose16 = Eigen::Translation3d(x16, y16, z16)
-//        * Eigen::Quaterniond(l_q16);
-//    kinematic_state->updateStateWithLinkAt("right_forearm_link", left_pose16);
-
-//    //--------------------------------
-//    double roll18, pitch18, yaw18;
-//    tf::Matrix3x3 matrix18;
-//    Eigen::Matrix3d link_orientation18 = joint_state18.rotation();
-//    tf::matrixEigenToTF(link_orientation18, matrix18);
-
-//    matrix18.getRPY(roll18, pitch18, yaw18);
-//    ROS_INFO("roll 18: %1.2f", roll18);
-//    ROS_INFO("pitch 18: %1.2f", pitch18);
-//    ROS_INFO("raw 18: %1.2f", yaw18);
-
-//    double l_roll_deg18= -89.38;//-89.38
-//    double l_pitch_deg18=-0.00;//-0.00
-//    double l_yaw_deg18=-87.50;//-78.50
-
-//    double l_roll_rad18 = l_roll_deg18 * (M_PI/180);
-//    double l_pitch_rad18 = l_pitch_deg18 * (M_PI/180);
-//    double l_yaw_rad18 = l_yaw_deg18 * (M_PI/180);
-
-//    tf::Quaternion l_q18;
-//    l_q18.setRPY(l_roll_rad18, l_pitch_rad18, l_yaw_rad18);
-//    Eigen::Affine3d left_pose18 = Eigen::Translation3d(x18, y18, z18)
-//        * Eigen::Quaterniond(l_q18);
-//    kinematic_state->updateStateWithLinkAt("right_wrist_2_link", left_pose18);
-
     kinematic_state->update();
-
   }
 };
 
